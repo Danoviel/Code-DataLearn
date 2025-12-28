@@ -1,4 +1,4 @@
-# Arquitectura del Sistema - CodeExplainer
+# Arquitectura del Sistema - Code DataLearn
 
 Este documento describe la arquitectura técnica completa del proyecto, incluyendo la estructura de carpetas, componentes principales y flujo de datos.
 
