@@ -1,0 +1,43 @@
+# ============================================================
+# CORE - Django y REST Framework
+# ============================================================
+Django==5.0.1
+djangorestframework==3.14.0
+django-cors-headers==4.3.1
+
+# ============================================================
+# DATABASE
+# ============================================================
+psycopg2-binary==2.9.9        # PostgreSQL adapter
+
+# ============================================================
+# AUTHENTICATION
+# ============================================================
+djangorestframework-simplejwt==5.3.1
+
+# ============================================================
+# UTILITIES
+# ============================================================
+python-decouple==3.8          # Manejo de variables de entorno
+requests==2.31.0               # HTTP client para APIs externas
+python-dotenv==1.0.0          # Cargar .env files
+
+# ============================================================
+# AI APIs
+# ============================================================
+anthropic==0.18.1             # Claude API (o comentar si usas OpenAI)
+# openai==1.10.0              # OpenAI API (descomentar si usas GPT)
+
+# ============================================================
+# PRODUCTION
+# ============================================================
+gunicorn==21.2.0              # WSGI server para producción
+whitenoise==6.6.0             # Servir archivos estáticos
+
+# ============================================================
+# DEVELOPMENT & TESTING
+# ============================================================
+pytest==7.4.4
+pytest-django==4.7.0
+black==24.1.1                 # Code formatter
+flake8==7.0.0                 # Linter

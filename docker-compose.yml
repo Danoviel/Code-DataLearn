@@ -1,0 +1,173 @@
+version: '3.8'
+
+# ============================================================
+# SERVICIOS (Contenedores que vamos a crear)
+# ============================================================
+services:
+
+  # ----------------------------------------------------------
+  # BASE DE DATOS - PostgreSQL
+  # ----------------------------------------------------------
+  db:
+    # Imagen oficial de PostgreSQL versión 16
+    image: postgres:16-alpine
+    
+    # Nombre del contenedor (más fácil de identificar)
+    container_name: codeexplainer_db
+    
+    # Reiniciar automáticamente si falla
+    restart: unless-stopped
+    
+    # Variables de entorno desde archivo .env
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}           # Nombre de la base de datos
+      POSTGRES_USER: ${POSTGRES_USER}       # Usuario de PostgreSQL
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}  # Contraseña
+      POSTGRES_HOST_AUTH_METHOD: trust      # Método de autenticación
+    
+    # Volumen para persistir los datos
+    # Sin esto, al borrar el contenedor pierdes la DB
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    
+    # Exponer puerto 5432 al host (opcional, para debugging)
+    ports:
+      - "5432:5432"
+    
+    # Health check - verifica que PostgreSQL esté listo
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 10s      # Cada 10 segundos
+      timeout: 5s        # Timeout de 5 segundos
+      retries: 5         # Reintentar 5 veces
+
+  # ----------------------------------------------------------
+  # BACKEND - Django
+  # ----------------------------------------------------------
+  backend:
+    # Construir imagen desde el Dockerfile en ./Backend
+    build:
+      context: ./Backend
+      dockerfile: Dockerfile
+    
+    container_name: codeexplainer_backend
+    
+    # Comando para ejecutar Django
+    # En desarrollo: runserver
+    # En producción: gunicorn
+    command: python manage.py runserver 0.0.0.0:8000
+    
+    # Volúmenes para desarrollo (hot reload)
+    # Mapea carpeta local → carpeta en contenedor
+    volumes:
+      - ./Backend:/app              # Código fuente
+      - backend_static:/app/static  # Archivos estáticos
+      - backend_media:/app/media    # Archivos subidos
+    
+    # Puerto del backend
+    ports:
+      - "8000:8000"
+    
+    # Variables de entorno
+    environment:
+      # Database
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_HOST: db              # Nombre del servicio de DB
+      POSTGRES_PORT: 5432
+      
+      # Django
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY}
+      DJANGO_DEBUG: ${DJANGO_DEBUG}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS}
+      
+      # APIs externas
+      JUDGE0_API_KEY: ${JUDGE0_API_KEY}
+      CLAUDE_API_KEY: ${CLAUDE_API_KEY}
+    
+    # Dependencias: backend espera a que db esté listo
+    depends_on:
+      db:
+        condition: service_healthy
+    
+    restart: unless-stopped
+
+  # ----------------------------------------------------------
+  # FRONTEND - React
+  # ----------------------------------------------------------
+  frontend:
+    build:
+      context: ./Frontend
+      dockerfile: Dockerfile
+      # Args para el build
+      args:
+        - VITE_API_URL=${VITE_API_URL}
+    
+    container_name: codeexplainer_frontend
+    
+    # Comando de desarrollo con Vite
+    command: npm run dev
+    
+    volumes:
+      - ./Frontend:/app
+      # Excluir node_modules del volumen (optimización)
+      - /app/node_modules
+    
+    ports:
+      - "3000:3000"
+    
+    environment:
+      - VITE_API_URL=${VITE_API_URL}
+    
+    depends_on:
+      - backend
+    
+    restart: unless-stopped
+
+  # ----------------------------------------------------------
+  # NGINX - Reverse Proxy (Opcional para producción)
+  # ----------------------------------------------------------
+  nginx:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    
+    container_name: codeexplainer_nginx
+    
+    # Mapeo de puertos
+    ports:
+      - "80:80"      # HTTP
+      # - "443:443"  # HTTPS (descomentar en producción)
+    
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - backend_static:/static:ro
+      - backend_media:/media:ro
+    
+    depends_on:
+      - backend
+      - frontend
+    
+    restart: unless-stopped
+    
+    # Comentar este servicio en desarrollo si no lo necesitas
+    profiles:
+      - production
+
+# ============================================================
+# VOLÚMENES (Almacenamiento persistente)
+# ============================================================
+volumes:
+  # Datos de PostgreSQL
+  postgres_data:
+    driver: local
+  
+  # Archivos estáticos de Django
+  backend_static:
+    driver: local
+  
+  # Archivos subidos (media)
+  backend_media:
+    driver: local
+
